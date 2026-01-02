@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Gerador de E-mails Descartáveis</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <style>
+    :root{
+      --bg:#0d0d0d;
+      --neon:#00f5ff;
+      --pink:#ff00c1;
+      --radius:12px;
+    }
+    body{
+      background:var(--bg);
+      color:#fff;
+      font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      padding:2rem;
+      min-height:100vh;
+    }
+    h1{
+      font-size:2rem;
+      margin-bottom:1rem;
+      text-shadow:0 0 8px var(--neon);
+    }
+    .card{
+      background:#111;
+      border:1px solid #222;
+      border-radius:var(--radius);
+      padding:1.5rem;
+      max-width:600px;
+      width:100%;
+      box-shadow:0 0 20px #0008;
+    }
+    .row{
+      display:flex;
+      gap:.5rem;
+      margin-bottom:1rem;
+    }
+    select,button,input{
+      padding:.75rem 1rem;
+      border-radius:var(--radius);
+      border:none;
+      font-size:1rem;
+    }
+    select{
+      flex:1;
+      background:#1a1a1a;
+      color:#fff;
+    }
+    button{
+      background:linear-gradient(45deg,var(--neon),var(--pink));
+      color:#000;
+      font-weight:bold;
+      cursor:pointer;
+      transition:.2s;
+    }
+    button:hover{filter:brightness(1.2);}
+    #email{
+      width:100%;
+      text-align:center;
+      letter-spacing:1px;
+    }
+    #copyBtn{
+      margin-top:.5rem;
+      width:100%;
+    }
+    #inbox{
+      margin-top:1.5rem;
+      max-height:300px;
+      overflow-y:auto;
+    }
+    .msg{
+      background:#1a1a1a;
+      border-left:4px solid var(--neon);
+      padding:1rem;
+      margin-bottom:.75rem;
+      border-radius:var(--radius);
+      font-size:.9rem;
+    }
+    .subject{font-weight:bold;margin-bottom:.25rem;}
+    .from{font-size:.75rem;color:#aaa;}
+    audio{display:none;}
+  </style>
+</head>
+<body>
+  <h1>Gerador de E-mails Descartáveis</h1>
+
+  <div class="card">
+    <div class="row">
+      <select id="domain">
+        <option value="@gmail.com">@gmail.com</option>
+        <option value="@hotmail.com">@hotmail.com</option>
+        <option value="@outlook.com">@outlook.com</option>
+      </select>
+      <button id="genBtn">Gerar</button>
+    </div>
+
+    <input id="email" readonly/>
+    <button id="copyBtn">Copiar e-mail</button>
+
+    <div id="inbox"></div>
+  </div>
+
+  <audio id="ding" preload="auto">
+    <source src="https://assets.mixkit.co/sfx/preview/mp3/button-09.mp3" type="audio/mpeg"/>
+  </audio>
+
+  <script>
+    const genBtn   = document.getElementById('genBtn');
+    const copyBtn  = document.getElementById('copyBtn');
+    const domainSel= document.getElementById('domain');
+    const emailInp = document.getElementById('email');
+    const inbox    = document.getElementById('inbox');
+    const ding     = document.getElementById('ding');
+
+    let currentAlias='';
+
+    function randStr(len=10){
+      return Array.from({length:len},()=>
+        'abcdefghijklmnopqrstuvwxyz0123456789'[Math.floor(Math.random()*36)]
+      ).join('');
+    }
+
+    function generate(){
+      const user = randStr();
+      const domain = domainSel.value;
+      currentAlias = user+domain;
+      emailInp.value = currentAlias;
+      inbox.innerHTML='<p style="color:#666">Aguardando mensagens…</p>';
+      listen();
+    }
+
+    function copy(){
+      emailInp.select();
+      document.execCommand('copy');
+      copyBtn.textContent='Copiado!';
+      setTimeout(()=>copyBtn.textContent='Copiar e-mail',1200);
+    }
+
+    /* ===== Temp Mail API (free) ===== */
+    function listen(){
+      const api='https://www.1secmail.com/api/v1/';
+      let cnt=0;
+      const poll=setInterval(async()=>{
+        const [login,domain]=currentAlias.split('@');
+        const list=await fetch(`${api}?action=getMessages&login=${login}&domain=${domain}`).then(r=>r.json());
+        if(list.length>cnt){
+          const newMsgs=list.slice(cnt);
+          cnt=list.length;
+          newMsgs.forEach(async m=>{
+            const raw=await fetch(`${api}?action=readMessage&login=${login}&domain=${domain}&id=${m.id}`).then(r=>r.json());
+            const div=document.createElement('div');
+            div.className='msg';
+            div.innerHTML=`
+              <div class="subject">${raw.subject||'(sem assunto)'}</div>
+              <div class="from">De: ${raw.from||raw.fromEmail}</div>
+              <div class="body">${(raw.textBody||raw.htmlBody||'').substring(0,200)}…</div>`;
+            inbox.insertBefore(div,inbox.firstChild);
+            ding.play();
+          });
+        }
+      },4000);
+      // para ao gerar novo e-mail
+      genBtn.addEventListener('click'=>clearInterval(poll),{once:true});
+    }
+
+    genBtn.addEventListener('click',generate);
+    copyBtn.addEventListener('click',copy);
+    generate(); // já gera um ao abrir
+  </script>
+</body>
+</html>
