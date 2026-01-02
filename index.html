@@ -108,69 +108,52 @@
   </audio>
 
   <script>
-    const genBtn   = document.getElementById('genBtn');
-    const copyBtn  = document.getElementById('copyBtn');
-    const domainSel= document.getElementById('domain');
-    const emailInp = document.getElementById('email');
-    const inbox    = document.getElementById('inbox');
-    const ding     = document.getElementById('ding');
+  let login, domain, checkInterval;
 
-    let currentAlias='';
+  /* ---------- gera endereço ---------- */
+  function generate() {
+    fetch('https://www.1secmail.com/api/?action=genRandomMailbox&count=1')
+      .then(r => r.json())
+      .then(data => {
+        const [full] = data;                // ex: "abc123@1secmail.com"
+        [login, domain] = full.split('@');
+        document.getElementById('addr').textContent = full;
+        startPolling();
+      });
+  }
 
-    function randStr(len=10){
-      return Array.from({length:len},()=>
-        'abcdefghijklmnopqrstuvwxyz0123456789'[Math.floor(Math.random()*36)]
-      ).join('');
-    }
-
-    function generate(){
-      const user = randStr();
-      const domain = domainSel.value;
-      currentAlias = user+domain;
-      emailInp.value = currentAlias;
-      inbox.innerHTML='<p style="color:#666">Aguardando mensagens…</p>';
-      listen();
-    }
-
-    function copy(){
-      emailInp.select();
-      document.execCommand('copy');
-      copyBtn.textContent='Copiado!';
-      setTimeout(()=>copyBtn.textContent='Copiar e-mail',1200);
-    }
-
-    /* ===== Temp Mail API (free) ===== */
-    function listen(){
-      const api='https://www.1secmail.com/api/v1/';
-      let cnt=0;
-      const poll=setInterval(async()=>{
-        const [login,domain]=currentAlias.split('@');
-        const list=await fetch(`${api}?action=getMessages&login=${login}&domain=${domain}`).then(r=>r.json());
-        if(list.length>cnt){
-          const newMsgs=list.slice(cnt);
-          cnt=list.length;
-          newMsgs.forEach(async m=>{
-            const raw=await fetch(`${api}?action=readMessage&login=${login}&domain=${domain}&id=${m.id}`).then(r=>r.json());
-            const div=document.createElement('div');
-            div.className='msg';
-            div.innerHTML=`
-              <div class="subject">${raw.subject||'(sem assunto)'}</div>
-              <div class="from">De: ${raw.from||raw.fromEmail}</div>
-              <div class="body">${(raw.textBody||raw.htmlBody||'').substring(0,200)}…</div>`;
-            inbox.insertBefore(div,inbox.firstChild);
-            ding.play();
+  /* ---------- atualiza mensagens ---------- */
+  function startPolling() {
+    if (checkInterval) clearInterval(checkInterval);
+    checkInterval = setInterval(() => {
+      fetch(`https://www.1secmail.com/api/?action=getMessages&login=${login}&domain=${domain}`)
+        .then(r => r.json())
+        .then(list => {
+          const box = document.getElementById('inbox');
+          box.innerHTML = '';
+          list.forEach(m => {
+            box.insertAdjacentHTML('beforeend',
+              `<div><b>${m.from}</b> – ${m.subject} <button onclick="readMail(${m.id})">Ler</button></div>`);
           });
-        }
-      },4000);
-      // para ao gerar novo e-mail
-      genBtn.addEventListener('click'=>clearInterval(poll),{once:true});
-    }
+        });
+    }, 3000);
+  }
 
-    genBtn.addEventListener('click',generate);
-    copyBtn.addEventListener('click',copy);
-    generate(); // já gera um ao abrir
-  </script>
+  /* ---------- lê conteúdo ---------- */
+  function readMail(id) {
+    fetch(`https://www.1secmail.com/api/?action=readMessage&login=${login}&domain=${domain}&id=${id}`)
+      .then(r => r.json())
+      .then(m => {
+        alert(m.textBody || m.htmlBody);
+      });
+  }
+
+  /* ---------- bind do botão ---------- */
+  document.getElementById('gerarBtn').addEventListener('click', generate);
+</script>
+
 </body>
 </html>
+
 
 
