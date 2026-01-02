@@ -152,8 +152,55 @@
   document.getElementById('gerarBtn').addEventListener('click', generate);
 </script>
 
+<body>
+  <!-- ELEMENTOS PRIMEIRO -->
+  <button id="gerarBtn">Gerar</button>
+  <div id="addr"></div>
+  <div id="inbox"></div>
+
+  <!-- SCRIPT DEPOIS -->
+  <script>
+    let login, domain, checkInterval;
+
+    function generate() {
+      fetch('https://www.1secmail.com/api/?action=genRandomMailbox&count=1')
+        .then(r => r.json())
+        .then(data => {
+          const [full] = data;
+          [login, domain] = full.split('@');
+          document.getElementById('addr').textContent = full;
+          startPolling();
+        });
+    }
+
+    function startPolling() {
+      if (checkInterval) clearInterval(checkInterval);
+      checkInterval = setInterval(() => {
+        fetch(`https://www.1secmail.com/api/?action=getMessages&login=${login}&domain=${domain}`)
+          .then(r => r.json())
+          .then(list => {
+            const box = document.getElementById('inbox');
+            box.innerHTML = '';
+            list.forEach(m => {
+              box.insertAdjacentHTML('beforeend',
+                `<div><b>${m.from}</b> – ${m.subject}
+                 <button onclick="readMail(${m.id})">Ler</button></div>`);
+            });
+          });
+      }, 3000);
+    }
+
+    function readMail(id) {
+      fetch(`https://www.1secmail.com/api/?action=readMessage&login=${login}&domain=${domain}&id=${id}`)
+        .then(r => r.json())
+        .then(m => alert(m.textBody || m.htmlBody));
+    }
+
+    document.getElementById('gerarBtn').addEventListener('click', generate);
+  </script>
 </body>
-</html>
+
+
 
 
 
